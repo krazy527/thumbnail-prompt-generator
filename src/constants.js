@@ -91,47 +91,106 @@ export const DEFAULT_THUMB_STATE = {
   customBgImage:null, customBgDim:0.45,
 };
  
-export function calcCTR(s) {
+export function calcCTR(layers) {
   let n = 0;
-  if (s.mainTitle?.trim())                        n += 15;
-  if ((s.mainTitle?.trim().length||0) <= 20)     n += 5;
-  if (s.glowEnabled)      n += 10;
-  if (s.vignetteEnabled)  n += 10;
-  if (s.particlesEnabled) n += 8;
-  if (s.neonBorderEnabled)n += 7;
-  if (s.bgBlurEnabled)    n += 8;
-  if (s.layoutType==="dual") n += 7;
-  if (s.subTextEnabled && s.subText?.trim()) n += 5;
-  if (s.bgWord?.trim()) n += 5;
-  if (s.useCustomExpression && s.customExprText?.trim()) n += 5;
-  if (s.scene==="custom" && s.customBgImage) n += 8;
+  const images = layers.filter(l => l.type === 'image' && l.visible);
+  const texts = layers.filter(l => l.type === 'text' && l.visible);
+  const effects = layers.filter(l => l.type === 'effect' && l.visible);
+  const bg = layers.find(l => l.type === 'background' && l.visible);
+
+  // Text bonuses
+  if (texts.length > 0) {
+    n += 15;
+    if (texts[0].content.length <= 20) n += 5; // Short title bonus
+    if (texts[0].stroke !== 'transparent') n += 5; // Outline bonus
+  }
+
+  // Image/Face bonuses
+  if (images.length > 0) {
+    if (images[0].glow) n += 10;
+  }
+  if (images.length > 1) {
+    n += 7; // Multi-char tension bonus
+  }
+
+  // Effects
+  if (effects.some(e => e.effectType === 'vignette')) n += 10;
+  if (effects.some(e => e.effectType === 'particles')) n += 8;
+  if (effects.some(e => e.effectType === 'neonBorder')) n += 7;
+
+  // Background
+  if (bg) {
+    if (bg.blur) n += 8;
+    if (bg.src) n += 8; // Custom BG bonus
+  }
+
   if (n>90) n = 90 + Math.min(10,(n-90)/2);
   return Math.min(100, n);
 }
  
-export function buildPrompt(s, prf) {
-  const sceneLabel = s.scene==="custom" ? "custom uploaded background" : s.scene.replace("_"," ");
-  const layoutDesc = {single:"single character",dual:"dual character split",multi:"multi character group"}[s.layoutType];
-  const exprText = s.useCustomExpression && s.customExprText?.trim()
-    ? s.customExprText.trim()
-    : {shock:"shocked, wide-eyed",hype:"hyped, ecstatic, huge grin",angry:"furious, intense",focus:"laser-focused, determined"}[s.expression];
-  return [
-    `**YouTube gaming thumbnail**, ${layoutDesc} composition.`,
-    ``,
-    `**SUBJECT:** Close-up portrait of ${prf.characterName||"AISHU"} positioned ${s.charPosition} frame, expression: ${exprText}. Face is #1 focal point — sharp, high-detail, outlined with ${s.glowColor} neon halo.`,
-    s.layoutType==="dual" ? `**RIGHT SIDE:** Game character in dynamic action pose, orange-yellow neon outline, split composition tension.` : "",
-    s.layoutType==="multi"? `**SUPPORT CHARS:** Two flanking characters at smaller scale, purple and orange neon outlines.` : "",
-    ``,
-    `**BACKGROUND:** ${s.scene==="custom"&&s.customBgImage ? "Custom image provided — apply cinematic color grade, dark overlay for contrast, keep subject dominant." : `${sceneLabel} scene, cinematic dark atmosphere.`} ${s.bgBlurEnabled?"Depth-of-field blur so subject dominates.":""} ${s.vignetteEnabled?"Heavy radial vignette — face is brightest zone.":""}`,
-    ``,
-    `**LIGHTING:** Dramatic rim lighting, neon spill from environment. Deep blacks + vivid neon highlights. Cinematic grade. Accent: ${SCENES[s.scene]?.accent??"#7c3aed"}.`,
-    s.glowEnabled       ? `**GLOW FX:** Subject outlined with ${s.glowColor} bloom. Atmospheric halos.` : "",
-    s.particlesEnabled  ? `**PARTICLES:** Floating embers/sparks for kinetic energy and depth.` : "",
-    s.neonBorderEnabled ? `**FRAME:** Thin neon border in ${s.glowColor}.` : "",
-    s.bgWord?.trim()    ? `**BG TEXT:** "${s.bgWord.toUpperCase()}" — massive translucent neon (8–12% opacity) behind subject.` : "",
-    ``,
-    `**TYPOGRAPHY:** Main title "${s.mainTitle||"YOUR TITLE"}" bottom-center — Bebas Neue ALL CAPS, white + yellow-orange outline, heavy shadow. ${s.subTextEnabled&&s.subText?`Sub: "${s.subText}".`:""} Channel: "${prf.channelName||"AISHU GAMING"}".`,
-    ``,
-    `**STYLE:** Hyper-stylized gaming art, 8K cinematic, CTR-optimized, 16:9, 1920×1080. Single dominant focal point, zero clutter.`,
-  ].filter(Boolean).join("\n");
+export function buildPrompt(layers, prf, projectSettings = { layoutType: "single" }) {
+  const images = layers.filter(l => l.type === 'image' && l.visible);
+  const texts = layers.filter(l => l.type === 'text' && l.visible);
+  const backgrounds = layers.filter(l => l.type === 'background' && l.visible);
+  const effects = layers.filter(l => l.type === 'effect' && l.visible);
+
+  const mainChar = images[0]; 
+  const layout = projectSettings.layoutType; // single, dual, multi
+
+  let prompt = [];
+  prompt.push(`**YouTube gaming thumbnail**, ${layout === 'single' ? 'single dominant subject' : layout === 'dual' ? 'dual character split composition with high tension' : 'multi-character squad composition'}.`);
+  prompt.push(``);
+
+  if (mainChar) {
+    let exprStr = mainChar.useCustomExpression && mainChar.customExprText 
+      ? mainChar.customExprText 
+      : mainChar.expression || "intense";
+    
+    prompt.push(`**SUBJECT:** High-quality character portrait. Face is the #1 focal point — sharp, highly detailed.`);
+    prompt.push(`Expression: **${exprStr}**.`);
+    
+    if (mainChar.beautify && mainChar.beautify !== "none") {
+      if (mainChar.beautify === "low") prompt.push(`Slightly retouched, clear skin.`);
+      if (mainChar.beautify === "mid") prompt.push(`Professional studio retouching, smooth skin, glowing complexion.`);
+      if (mainChar.beautify === "high") prompt.push(`Flawless hyper-realistic skin, heavy beauty retouching, high-end 8k editorial portrait lighting.`);
+    }
+
+    if (mainChar.glow) {
+      prompt.push(`Outlined with intense ${mainChar.glowColor} neon halo/glow.`);
+    }
+  }
+
+  if (images.length > 1) {
+    prompt.push(`**ADDITIONAL SUBJECTS:** ${images.length - 1} supporting characters positioned for dynamic tension and balance.`);
+  }
+
+  const bg = backgrounds[0];
+  if (bg) {
+    prompt.push(``);
+    let sceneStr = bg.scene === "custom" ? "custom custom-image backdrop" : (bg.scene || "explosion").replace("_", " ");
+    prompt.push(`**BACKGROUND:** Cinematic dark atmosphere. Scene: **${sceneStr}**.`);
+    if (bg.blur) prompt.push(`Heavy depth-of-field blur so subjects pop.`);
+  }
+
+  prompt.push(``);
+  prompt.push(`**LIGHTING & FX:** Dramatic rim lighting, deep blacks, high contrast cinematic color grade.`);
+  
+  effects.forEach(ef => {
+    if (ef.effectType === 'vignette') prompt.push(`- Heavy radial vignette forcing eye to center.`);
+    if (ef.effectType === 'particles') prompt.push(`- Floating ${ef.color} embers and sparks for kinetic energy.`);
+    if (ef.effectType === 'neonBorder') prompt.push(`- Thin ${ef.color} glowing neon border framing the composition.`);
+  });
+
+  if (texts.length > 0) {
+    prompt.push(``);
+    prompt.push(`**TYPOGRAPHY & BRANDING:**`);
+    texts.forEach((t, i) => {
+      prompt.push(`- Text ${i+1}: "${t.content.trim()}" in ultra-bold ALL CAPS font. Color: ${t.color}. ${t.stroke !== 'transparent' ? `Outline: ${t.stroke}.` : ''}`);
+    });
+  }
+
+  prompt.push(``);
+  prompt.push(`**STYLE:** Hyper-stylized gaming art, 8K cinematic, CTR-optimized, 16:9, 1920×1080. Single dominant focal point, zero clutter.`);
+
+  return prompt.join("\\n");
 }

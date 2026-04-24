@@ -1,65 +1,158 @@
-import { PRESET_EXPR, SCENE_OVERLAYS, SCENES } from "../../constants";
+import { SCENES, PRESET_EXPR } from "../../constants";
 
-export default function ThumbnailPreview({ s, prf }) {
-  const scene   = SCENES[s.scene]        || SCENES.explosion;
-  const overlay = SCENE_OVERLAYS[s.scene] || SCENE_OVERLAYS.explosion;
-  const glowC   = s.glowColor            || "#7c3aed";
-  const textC   = s.mainTextColor        || "#ffffff";
-  const faceLeft  = s.charPosition==="left"?"8%":s.charPosition==="center"?"50%":"auto";
-  const faceRight = s.charPosition==="right"?"8%":"auto";
-  const particles = s.particlesEnabled
-    ? Array.from({length:14},(_,i)=>({
-        x:Math.floor((i*137.508)%100), y:Math.floor((i*97.3)%80)+5,
-        size:(i%3)+3, color:overlay.sparks[i%3],
-        dur:(2+i*0.3).toFixed(1), delay:(i*0.18).toFixed(1),
-      }))
-    : [];
-  const exprEmoji  = !s.useCustomExpression?(PRESET_EXPR[s.expression]||"😱"):null;
-  const customLabel = s.useCustomExpression&&s.customExprText?.trim()?s.customExprText.trim():null;
-  const isCustomBg  = s.scene==="custom"&&s.customBgImage;
- 
+export default function ThumbnailPreview({ layers }) {
+  // We want to render the bottom layers first. 
+  // If layers are ordered top-to-bottom in the UI list, we should reverse them for rendering.
+  const renderLayers = [...layers].reverse();
+
   return (
-    <div className="thumb-canvas" style={isCustomBg
-      ?{backgroundImage:`url(${s.customBgImage})`,backgroundSize:"cover",backgroundPosition:"center"}
-      :{background:scene.bg}
-    }>
-      {isCustomBg&&<div style={{position:"absolute",inset:0,zIndex:1,background:`rgba(0,0,0,${s.customBgDim??0.45})`,backdropFilter:s.bgBlurEnabled?"blur(3px)":"none",transition:"all .3s"}}/>}
-      {!isCustomBg&&<div style={{position:"absolute",inset:0,zIndex:1,background:`radial-gradient(ellipse 70% 60% at 50% 50%,${scene.accent}22,transparent 70%)`,transition:"all .4s"}}/>}
-      {s.layoutType==="dual"&&<>
-        <div style={{position:"absolute",left:0,top:0,width:"50%",height:"100%",zIndex:2,background:"linear-gradient(90deg,rgba(0,50,150,.25),transparent)"}}/>
-        <div style={{position:"absolute",right:0,top:0,width:"50%",height:"100%",zIndex:2,background:"linear-gradient(270deg,rgba(200,50,0,.25),transparent)"}}/>
-      </>}
-      {s.vignetteEnabled&&<div className="vignette-overlay" style={{zIndex:3}}/>}
-      {particles.map((p,i)=>(
-        <div key={i} className="particle" style={{left:`${p.x}%`,top:`${p.y}%`,width:p.size,height:p.size,background:p.color,boxShadow:`0 0 ${p.size*2}px ${p.color}`,"--dur":`${p.dur}s`,"--delay":`-${p.delay}s`}}/>
-      ))}
-      {s.bgWord?.trim()&&<div className="bg-word" style={{color:s.bgTextColor||"#ffffff"}}>{s.bgWord.toUpperCase()}</div>}
-      <div className="face-placeholder" style={{bottom:"22%",left:faceLeft,right:faceRight,transform:s.charPosition==="center"?"translateX(-50%)":"none"}}>
-        <div className="face-circle" style={{
-          width:s.layoutType==="single"?"clamp(60px,15vw,120px)":"clamp(48px,11vw,90px)",
-          height:s.layoutType==="single"?"clamp(60px,15vw,120px)":"clamp(48px,11vw,90px)",
-          background:`radial-gradient(circle,${glowC}33,#1a1a1a)`,
-          border:s.glowEnabled?`2px solid ${glowC}`:"2px solid rgba(255,255,255,.1)",
-          boxShadow:s.glowEnabled?`0 0 20px ${glowC},0 0 40px ${glowC}44,inset 0 0 20px ${glowC}22`:"none",
-        }}>{exprEmoji||"⚡"}</div>
-        <div className="face-name" style={{color:glowC}}>{prf.characterName||"AISHU"}</div>
-      </div>
-      {(s.layoutType==="dual"||s.layoutType==="multi")&&(
-        <div className="game-char" style={{bottom:"20%",right:"6%"}}>
-          <div className="char-body" style={{width:"clamp(44px,10vw,80px)",height:"clamp(44px,10vw,80px)",background:"radial-gradient(circle,#ff660033,#1a1a1a)",border:"2px solid #f97316",boxShadow:"0 0 18px #f97316,0 0 36px #f9731644",borderRadius:"10px"}}>🗡️</div>
-        </div>
-      )}
-      {s.layoutType==="multi"&&(
-        <div className="game-char" style={{bottom:"18%",left:"6%"}}>
-          <div className="char-body" style={{width:"clamp(36px,8vw,64px)",height:"clamp(36px,8vw,64px)",background:"radial-gradient(circle,#ec489933,#1a1a1a)",border:"2px solid #ec4899",boxShadow:"0 0 14px #ec4899,0 0 28px #ec489944",borderRadius:"10px"}}>🛡️</div>
-        </div>
-      )}
-      {s.layoutType==="dual"&&<div className="arrow-element" style={{left:"44%",bottom:"36%"}}>⚡</div>}
-      {s.neonBorderEnabled&&<div className="neon-border-overlay" style={{boxShadow:`inset 0 0 0 2px ${glowC},inset 0 0 20px ${glowC}44`}}/>}
-      <div className="thumb-title" style={{color:textC,WebkitTextStroke:`1px ${overlay.sparks[0]}`,filter:`drop-shadow(0 0 8px ${glowC}88)`}}>{s.mainTitle||"YOUR TITLE HERE"}</div>
-      {s.subTextEnabled&&s.subText?.trim()&&<div className="thumb-subtext" style={{color:glowC}}>{s.subText.toUpperCase()}</div>}
-      <div className="brand-tag" style={{color:glowC,borderColor:`${glowC}66`,background:`${glowC}11`,textShadow:`0 0 8px ${glowC}`}}>{prf.channelName||"AISHU GAMING"}</div>
-      {customLabel&&<div className="custom-expr-badge" style={{color:glowC,borderColor:`${glowC}88`,background:`${glowC}22`,textShadow:`0 0 6px ${glowC}`}}>{customLabel}</div>}
+    <div className="thumb-canvas" style={{ background: "#0a0a14" }}>
+      {renderLayers.map((layer) => {
+        if (!layer.visible) return null;
+
+        // BACKGROUND LAYER
+        if (layer.type === "background") {
+          return (
+            <div key={layer.id} style={{ position: "absolute", inset: 0, zIndex: 1, opacity: layer.opacity }}>
+              {layer.src ? (
+                <div style={{
+                  position: "absolute", inset: 0,
+                  backgroundImage: `url(${layer.src})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  filter: layer.blur ? "blur(4px)" : "none",
+                  transform: layer.blur ? "scale(1.05)" : "scale(1)", // prevent blur edge bleed
+                }} />
+              ) : (
+                <div style={{ 
+                  position: "absolute", inset: 0, 
+                  background: (SCENES[layer.scene || "explosion"] || SCENES.explosion).bg 
+                }} />
+              )}
+              {/* Darkness overlay */}
+              <div style={{
+                position: "absolute", inset: 0,
+                background: `rgba(0,0,0,${layer.brightness ?? 0})`,
+                pointerEvents: "none"
+              }} />
+            </div>
+          );
+        }
+
+        // IMAGE LAYER
+        if (layer.type === "image") {
+          return (
+            <div key={layer.id} style={{
+              position: "absolute",
+              left: `${layer.x}%`,
+              top: `${layer.y}%`,
+              transform: "translate(-50%, -50%)",
+              width: layer.width,
+              height: layer.height,
+              zIndex: 5,
+              opacity: layer.opacity,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}>
+              {layer.src ? (
+                <img 
+                  src={layer.src} 
+                  alt={layer.name}
+                  style={{
+                    width: "100%", 
+                    height: "100%", 
+                    objectFit: "contain",
+                    filter: layer.glow ? `drop-shadow(0 0 ${layer.width * 0.08}px ${layer.glowColor})` : "none"
+                  }} 
+                />
+              ) : (
+                <div style={{
+                  width: "100%", height: "100%", 
+                  background: `radial-gradient(circle, ${layer.glowColor || "#7c3aed"}33, #1a1a1a)`,
+                  border: layer.glow ? `2px solid ${layer.glowColor}` : "2px solid rgba(255,255,255,.1)",
+                  boxShadow: layer.glow ? `0 0 20px ${layer.glowColor}, 0 0 40px ${layer.glowColor}44, inset 0 0 20px ${layer.glowColor}22` : "none",
+                  borderRadius: "50%",
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  color: "#fff"
+                }}>
+                  <div style={{ fontSize: layer.width * 0.35 }}>
+                    {layer.useCustomExpression ? "🎭" : (PRESET_EXPR[layer.expression] || "🖼️")}
+                  </div>
+                  {layer.beautify && layer.beautify !== "none" && (
+                    <div style={{ fontSize: layer.width * 0.1, color: "var(--pink)", fontWeight: 700, marginTop: 4 }}>
+                      ✦ Beautify {layer.beautify}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // TEXT LAYER
+        if (layer.type === "text") {
+          return (
+            <div key={layer.id} style={{
+              position: "absolute",
+              left: `${layer.x}%`,
+              top: `${layer.y}%`,
+              transform: "translate(-50%, -50%)",
+              zIndex: 10,
+              opacity: layer.opacity,
+              color: layer.color,
+              fontSize: `${layer.fontSize}px`,
+              fontFamily: "'Bebas Neue', sans-serif",
+              letterSpacing: "3px",
+              WebkitTextStroke: layer.stroke !== "transparent" ? `2px ${layer.stroke}` : "none",
+              textShadow: layer.shadow ? `4px 4px 0 rgba(0,0,0,0.8), 0 0 20px ${layer.color}` : "none",
+              textAlign: "center",
+              whiteSpace: "pre-wrap",
+              lineHeight: 1.2
+            }}>
+              {layer.content || "TEXT"}
+            </div>
+          );
+        }
+
+        // EFFECT LAYER
+        if (layer.type === "effect") {
+          if (layer.effectType === "vignette") {
+            return <div key={layer.id} style={{
+              position: "absolute", inset: 0, zIndex: 15, pointerEvents: "none", opacity: layer.opacity,
+              background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 100%)"
+            }} />;
+          }
+          if (layer.effectType === "neonBorder") {
+            return <div key={layer.id} style={{
+              position: "absolute", inset: 0, zIndex: 15, pointerEvents: "none", opacity: layer.opacity,
+              boxShadow: `inset 0 0 0 4px ${layer.color}, inset 0 0 30px ${layer.color}88`,
+              borderRadius: "10px"
+            }} />;
+          }
+          if (layer.effectType === "particles") {
+             // Generate static particles for preview purely using CSS
+             const particles = Array.from({length: 12}).map((_, i) => ({
+               x: Math.floor((i * 137.5) % 100),
+               y: Math.floor((i * 97.3) % 100),
+               size: (i % 3) + 4
+             }));
+             return (
+               <div key={layer.id} style={{ position: "absolute", inset: 0, zIndex: 14, pointerEvents: "none", opacity: layer.opacity }}>
+                 {particles.map((p, i) => (
+                   <div key={i} style={{
+                     position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
+                     width: p.size, height: p.size, borderRadius: "50%",
+                     background: layer.color, boxShadow: `0 0 ${p.size*2}px ${layer.color}`
+                   }} />
+                 ))}
+               </div>
+             );
+          }
+        }
+
+        return null;
+      })}
     </div>
   );
 }

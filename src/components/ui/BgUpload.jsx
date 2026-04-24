@@ -6,9 +6,8 @@ export default function BgUpload({ imageUrl, onImage, onClear }) {
  
   const processFile = (file) => {
     if (!file||!file.type.startsWith("image/")) return;
-    const r = new FileReader();
-    r.onload = e => onImage(e.target.result);
-    r.readAsDataURL(file);
+    const url = URL.createObjectURL(file);
+    onImage(url);
   };
  
   return (
